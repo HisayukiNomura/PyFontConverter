@@ -18,9 +18,9 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args":[
-                "-xs","12",
-                "-ys","12",
+                "-s","12",
                 "-cs","SCHOOL",
+//                "-m" , "NONE",
                 "-v",
 //                "-i",
 //                "test"

@@ -63,11 +63,11 @@ def render_glyph_to_bitmap(font, char_unicode , char, font_XSize=64,font_YSize=6
     if (len(char) == 4) :           # 印刷不能の１バイト文字
         image = image.crop((0,0,font_XSize/2,font_YSize))
     elif char_unicode <= 0xFF :        # 半角文字の場合
-        if (char_unicode >= 0x80) :         # 半角文字の0x80以上は、半角カナ文字にマッピングを変える
+        if mapping == "KANA" and char_unicode >= 0xA1 and char_unicode <= 0xDF : # カナ文字にマッピングする場合、半角文字のカナ文字は、半角カナ文字にマッピングを変える
             charwk = chr(char_unicode - 0xa1 + 0xFF61)  # 半角カナに変換
             draw.text((X_offset, Y_offset), charwk, font=font, fill=1)  # 文字を黒で描画
             image = image.crop((0,0,font_XSize/2,font_YSize))
-        else:
+        else:           # 半角文字の場合                                            # 何もしない場合、ASCIIの拡張コードのママとする
             draw.text((X_offset, Y_offset), char, font=font, fill=1)  # 文字を黒で描画
             image = image.crop((0,0,font_XSize/2,font_YSize))
     else:                           # 全角文字の場合
@@ -151,25 +151,45 @@ def jis_to_encodings(jis_code):
 # 0x00～0xFFの場合は、JIS、SJIS、UTF-8は同じ値になる
 # 戻り値は、utf-8,sjis,jis,文字,ｗ,ｈ、オフセット。 W,H,オフセットは後から決定する
 def getCodeTbl(codeRange): 
+    if (isVerbose):
+        print(f"Get Code table for {hex(codeRange.start)}-{hex(codeRange.stop)}")  
+
     CodeList = []
     for code in codeRange:
-        if (code > 0x00 and  code < 0xFF):
-            char = chr(code)
-            if not char.isprintable() :
-                char = "0x" + hex(code)[2:].zfill(2)
-            codeList.append([code,code,code,char,0,0,0])
-            continue
+        if (code >= 0x00 and  code <= 0xFF):
+            if (isVerbose):
+                print(f"\tAnalyzing Code: {hex(code)} as single-byte code....",end="")
+            if mapping == "KANA" and code >= 0xA1 and code <= 0xDF :  # カナ文字にマッピングする場合、半角カナ文字は、全角カナ文字にマッピングを変える
+                if (isVerbose):
+                    print(f"{hex(code)} is Hankaku-Kana charactor")
+                char = chr(code - 0xa1 + 0xFF61)
+                codeList.append([code,code,code,char,0,0,0])
+            else:
+                if (isVerbose):
+                    print(f"{hex(code)} is ASCII charactor" , end="")
+                char = chr(code)
+                if not char.isprintable() :
+                    char = "0x" + hex(code)[2:].zfill(2)
+                    print("(non-printable)",end="")
+                print()
+                codeList.append([code,code,code,char,0,0,0])
+            if (isVerbose):
+                print(f"\t\tJIS-Code: {hex(code)}, Shift-JIS: {hex(code)}, UTF-8: {hex(code)} ")
+
         else:
+            if (isVerbose):
+                print(f"\tAnalyzing Code: {hex(code)} as multi-byte code")
             codeJIS , codeSJIS , codeUTF8 = jis_to_encodings(code)
             if codeJIS == 0 or codeSJIS == 0 or codeUTF8 == 0:
-                #print(f"JISコード: {hex(code)}をスキップ")
+                if (isVerbose):
+                    print(f"\t\tSkipping Code: {hex(code)} because no UTF-8 charctor assigned for this code")
                 continue
-            #print(f"JISコード: {hex(codeJIS)}, Shift-JIS: {hex(codeSJIS)}, UTF-8: {hex(codeUTF8)} ")
-
             unicode_char = decode_utf8(codeUTF8)  # JISコードをUnicode文字に変換
-
-            
             CodeList.append([codeUTF8,codeSJIS,codeJIS,unicode_char,0,0,0])
+
+            if (isVerbose):
+                print(f"\t\tJIS-Code: {hex(codeJIS)}, Shift-JIS: {hex(codeSJIS)}, UTF-8: {hex(codeUTF8)} ")
+
     return CodeList
 
 # コードの一覧からビットマップ配列を作り、コード一覧にはビットマップのオフセット位置を追加する関数
@@ -177,7 +197,8 @@ def convToDataAndBitmap(codeList,fontXSize,fontYSize,xOffset = 0,yOffset=-1):
     byteOffset = 0
     for code in codeList:
         code[6] = byteOffset
-        print(hex(code[0]),hex(code[1]),hex(code[2]),code[3],code[6])
+        if isVerbose:
+            print(hex(code[0]),hex(code[1]),hex(code[2]),code[3],code[6])
         bitmap_image = render_glyph_to_bitmap(font,code[0], code[3], fontXSize, fontYSize ,xOffset,yOffset)
         code[4] = bitmap_image.size[0]  # 幅を取得
         code[5] = bitmap_image.size[1]  # 高さを取得
@@ -220,21 +241,22 @@ if __name__ == "__main__":
     )
     parser.add_argument("font_path", type=str,help="Path to the turetype font file")
     parser.add_argument("-n", "--name", type=str, default="", help="Name of generated structure instance")
-    parser.add_argument("-xs", "--xsize", type=int, default=12, help="Font X size")
-    parser.add_argument("-ys", "--ysize", type=int, default=12, help="Font y size")
+    parser.add_argument("-s", "--size", type=int, default=12, help="Font size")
     parser.add_argument("-xo", "--xoffset", type=int, default=0, help="X offset")
     parser.add_argument("-yo", "--yoffset", type=int, default=-1, help="Y offset")
     parser.add_argument("-cs", "--codeset", choices=["ALL","LEVEL1","SCHOOL","TEST"], default="ALL", help="Code set to use.")
     parser.add_argument("-o", "--output", type=str, default="XXX.XXX", help="Output file name")
+    parser.add_argument("-m", "--mapping", choices=["KANA","NONE"], default="KANA", help="Extra Mapping for 0x80-0xFF")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-i", "--image", action="store_true", help="Display truetype font image")
     args = parser.parse_args()
     font_path = args.font_path
-    font_XSize = args.xsize
-    font_YSize = args.ysize
+    font_XSize = args.size
+    font_YSize = args.size
     x_offset = args.xoffset
     y_offset = args.yoffset
     code_set = args.codeset
+    mapping = args.mapping
     output_file = args.output
     isVerbose = args.verbose
     isImage = args.image
@@ -272,9 +294,9 @@ if __name__ == "__main__":
     # Pillowでフォントを読み込み
     font =  ImageFont.truetype(font_path, font_XSize)
 
-    ASCII = range(0x0000,0x00FF)
-    JISL1 = range(0x3021,0x4f53)
-    JISL2 = range(0x5021,0x7426)
+    ASCII = range(0x0000,0x0100)
+    JISL1 = range(0x3021,0x4f54)
+    JISL2 = range(0x5021,0x7427)
     JISKIGOU = range(0x2121,0x2F7E)
     
     test1 = range(0x0041,0x0042) 
@@ -283,26 +305,40 @@ if __name__ == "__main__":
     
     codeList = []
 
+    if isVerbose :
+        print(f"Get Code tables....")
+
     if (code_set == "ALL"):
+        if isVerbose :
+            print(f"Get Code tables for ASCII/JISL1/JISL2/JISKIGOU....")
         codeList += getCodeTbl(ASCII)
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISL2)
         codeList += getCodeTbl(JISKIGOU)   
     elif (code_set == "LEVEL1"):
+        if isVerbose :
+            print(f"Get Code tables for ASCII/JISL1/JISKIGOU....")
         codeList += getCodeTbl(ASCII)
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISKIGOU)
     elif (code_set == "SCHOOL"):
         #教育漢字の場合、少し複雑。とりあえずJISL1のテーブルを作って、そこから該当しないものを削除していくことにする。
+        if isVerbose :
+            print(f"Get Code tables for ASCII/JISL1/JISKIGOU....")
         codeList += getCodeTbl(ASCII)
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISKIGOU)
+        if isVerbose :
+            print(f"Removing non-Kyouiku Kanji characters....")
+
         for d in codeList :
             if d[0] <= 0xFF:            #１バイト文字は含める
                 continue
             if d[3] not in KyouikuKanji:    #教育漢字に含まれないものは削除する
                 codeList.remove(d)
     elif (code_set == "TEST"):
+        if isVerbose :
+            print(f"Test Mode")
         codeList += getCodeTbl(test1)
         codeList += getCodeTbl(test2)
 
