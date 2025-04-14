@@ -18,8 +18,13 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args":[
-                "JF-Dot-Shinonome12.ttf" , 
-                "-v"
+                "-xs","12",
+                "-ys","12",
+                "-cs","SCHOOL",
+                "-v",
+//                "-i",
+//                "test"
+                "JF-Dot-Shinonome12.ttf" 
             ]
 
         }
