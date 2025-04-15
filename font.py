@@ -303,6 +303,13 @@ For example, the single-byte codes 0xA1–0xDF will result in undefined glyphs f
 the ISO8859 standard, leading to unexpected character shapes.                          
 if not specified, the default value is KANA.
 """)
+    parser.add_argument("-em","--endmark" , choices=["ALLZERO","ALLMAX","NONE"], default="ALLZERO", help="""Specify the Type of End Mark to Add at the End of the Data.
+Defines the type of end mark to append at the end of the data. A special line indicating the termination will be added to the end of the data.
+- ALLZERO: Appends a termination marker where all values for UTF8, SJIS, and JIS are set to zero.  
+- ALLMAX: Appends a termination marker where all values for UTF8, SJIS, and JIS are set to MAX VALUE.  
+- NONE: No termination mark will be used.  
+If not specified, the default value is ALLZERO.                        
+""")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-i", "--image", action="store_true", help="Display truetype font image")
     args = parser.parse_args()
@@ -316,6 +323,7 @@ if not specified, the default value is KANA.
     output_file = args.output
     isVerbose = args.verbose
     isImage = args.image
+    isEndMark = args.endmark
 
 
 
@@ -424,6 +432,8 @@ if not specified, the default value is KANA.
         strOutput +="// Code Set: " + code_set + "\n"
         strOutput +="// Character count: " + str(len(codeList)) + "\n"
         strOutput +=f"// data size:{total_size(bmpList):} bytes\n"
+        strOutput +=f"// \n"
+
         f.write(strOutput)
         if isVerbose:
             print(strOutput,end="")
@@ -432,26 +442,32 @@ if not specified, the default value is KANA.
 
         #まず、ビットマップ情報の表示
         strOutput = ""
-        
+        strOutput += "/*\n"
         strOutput += "struct KanjiData {\n"
-        strOutput += "\tuint32_t Unidoe;\n"
+        strOutput += "\tuint32_t Unicode;\n"
         strOutput += "\tuint16_t SJIS;\n"
         strOutput += "\tuint16_t JIS;\n"  
         strOutput += "\tuint8_t width;\n"
         strOutput += "\tuint8_t height;\n"
         strOutput += "\tuint32_t offsetBMP;\n"
         strOutput += "};\n"
+        strOutput += "*/\n"
 
         f.write(strOutput)
         if isVerbose:
             print(strOutput,end="")
             print()
 
+        if (isEndMark == "ALLZERO"):
+            codeList.append([0,0,0,"",0,0,0])
+        elif (isEndMark == "ALLMAX"):
+            codeList.append([0xFFFFFFFF,0xFFFF,0xFFFF,"",0,0,0])
+
         strOutput = ""
         strOutput += f"static const KanjiData {structure_name}[] = {{\n"
         for i, code in enumerate(codeList):
             strWkLine = ""
-            strWkLine = f"\t{{ 0x{hex(code[0])[2:].zfill(8)} , 0x{hex(code[1])[2:].zfill(4)} , 0x{hex(code[2])[2:].zfill(4)} , {code[4]:>2} ,{code[5]:>2} , 0x{hex(code[6])[2:].zfill(8)} }}}}"
+            strWkLine = "\t{" + f"0x{hex(code[0])[2:].zfill(8)} , 0x{hex(code[1])[2:].zfill(4)} , 0x{hex(code[2])[2:].zfill(4)} , {code[4]:>2} ,{code[5]:>2} , 0x{hex(code[6])[2:].zfill(8)}" + "}"
             if i < len(codeList) - 1:
                 strWkLine += ","
             else:
