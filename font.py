@@ -46,37 +46,50 @@ def decode_utf8(codeUTF8):
 
 ## フォントをビットマップにレンダリングする関数
 def render_glyph_to_bitmap(font, char_unicode , char, font_XSize=64,font_YSize=64,X_offset = 0,Y_offset=-1):
+    if isVerbose:
+        print(f"\t\trender_glyph_to_bitmap:Rendering glyph: {char} (Unicode: {hex(char_unicode)})")
     global isImage
-    # FontToolsでフォントファイルを解析
-    #ttfont = TTFont(font_path)
-    #print(f"Font Family: {ttfont['name'].getDebugName(1)}")  # フォントファミリー名を取得
 
-    # Pillowでフォントを読み込み
-    #font = ImageFont.truetype(font_path, font_size)
-    
     # ビットマップ画像を作成
+    if isVerbose:
+        print(f"\t\t\tCreating {font_XSize},{font_YSize} image and drawing object.")
+
     image_size = (font_XSize , font_YSize )  # 画像サイズを指定
     image = Image.new("L", image_size, color=255)  # グレースケール画像（白背景）
     draw = ImageDraw.Draw(image)
     
     #半角文字の場合には、半分のサイズにする
-    if (len(char) == 4) :           # 印刷不能の１バイト文字
+    if isVerbose:
+        print(f"\t\t\tdrawing character to offscreen image.")
+    if (len(char) == 4) :           # 印刷不能の１バイト文字。何もせず、イメージのサイズを半分にする。（半角なので）
+        if isVerbose:
+            print(f"\t\t\t\tUnprintable half-size character.")
         image = image.crop((0,0,font_XSize/2,font_YSize))
     elif char_unicode <= 0xFF :        # 半角文字の場合
+        if isVerbose:
+            print(f"\t\t\t\tHalf size character...",end="")
         if mapping == "KANA" and char_unicode >= 0xA1 and char_unicode <= 0xDF : # カナ文字にマッピングする場合、半角文字のカナ文字は、半角カナ文字にマッピングを変える
             charwk = chr(char_unicode - 0xa1 + 0xFF61)  # 半角カナに変換
+            if isVerbose:
+                print(f"re-mapping for Hankaku-Kana character {chr(char_unicode)}({hex(char_unicode)}) -> {charwk}({hex(ord(charwk))}) , draw and  crop to half-size")
             draw.text((X_offset, Y_offset), charwk, font=font, fill=1)  # 文字を黒で描画
             image = image.crop((0,0,font_XSize/2,font_YSize))
         else:           # 半角文字の場合                                            # 何もしない場合、ASCIIの拡張コードのママとする
+            if isVerbose:
+                print(f"draw and crop to half-size")
             draw.text((X_offset, Y_offset), char, font=font, fill=1)  # 文字を黒で描画
             image = image.crop((0,0,font_XSize/2,font_YSize))
     else:                           # 全角文字の場合
+        if isVerbose:
+            print(f"\t\t\t\tFull size character.")
         draw.text((X_offset, Y_offset), char, font=font, fill=1)  # 文字を黒で描画
     
     if isImage:
         image.show()
         print("Displaying the image. Please close the window before pressing [ENTER]...")
         input()  
+    if isVerbose:
+        print(f"\t\tdone. Image size: {image.size}")
     return image
 
 ## 画像データを、ビットマップ配列にする
@@ -107,16 +120,7 @@ def display_bitmap_data(image):
         for value in byte_array :
             #print(bin(value)[2:].zfill(8),end="")  # バイナリ形式で表示
             bitArray[i] = byte_array
-        #print()
-    #print()
 
-    """
-    for row in bitArray:
-        for value in row:
-            print(bin(value)[2:].zfill(8), end="")
-        print() 
-    print()
-    """
     return bitArray
 
 
@@ -152,59 +156,65 @@ def jis_to_encodings(jis_code):
 # 戻り値は、utf-8,sjis,jis,文字,ｗ,ｈ、オフセット。 W,H,オフセットは後から決定する
 def getCodeTbl(codeRange): 
     if (isVerbose):
-        print(f"Get Code table for {hex(codeRange.start)}-{hex(codeRange.stop)}")  
+        print(f"\tGet Code table for {hex(codeRange.start)}-{hex(codeRange.stop)}")  
 
     CodeList = []
     for code in codeRange:
         if (code >= 0x00 and  code <= 0xFF):
             if (isVerbose):
-                print(f"\tAnalyzing Code: {hex(code)} as single-byte code....",end="")
+                print(f"\t\tAnalyzing Code: {hex(code)} as single-byte code....",end="")
             if mapping == "KANA" and code >= 0xA1 and code <= 0xDF :  # カナ文字にマッピングする場合、半角カナ文字は、全角カナ文字にマッピングを変える
                 if (isVerbose):
                     print(f"{hex(code)} is Hankaku-Kana charactor")
                 char = chr(code - 0xa1 + 0xFF61)
                 codeList.append([code,code,code,char,0,0,0])
-            else:
-                if (isVerbose):
-                    print(f"{hex(code)} is ASCII charactor" , end="")
+            else:                                                   # 半角文字、カナ文字マッピングを行わない場合                                           
                 char = chr(code)
-                if not char.isprintable() :
-                    char = "0x" + hex(code)[2:].zfill(2)
-                    print("(non-printable)",end="")
-                print()
+                if char.isprintable():                     # 印刷できる文字の場合
+                    if (isVerbose):
+                        print(f"{hex(code)} \"{code}\" is ASCII charactor" )
+                else:
+                    if (isVerbose):
+                        print(f"{hex(code)} is non-printable ASCII charactor" )
+                    char = "0x" + hex(code)[2:].zfill(2)            # 印刷できない文字は、コードをそのまま表示する
                 codeList.append([code,code,code,char,0,0,0])
             if (isVerbose):
-                print(f"\t\tJIS-Code: {hex(code)}, Shift-JIS: {hex(code)}, UTF-8: {hex(code)} ")
+                print(f"\t\t\tJIS-Code: {hex(code)}, Shift-JIS: {hex(code)}, UTF-8: {hex(code)} ")
 
         else:
             if (isVerbose):
-                print(f"\tAnalyzing Code: {hex(code)} as multi-byte code")
+                print(f"\t\tAnalyzing Code: {hex(code)} as multi-byte code")
             codeJIS , codeSJIS , codeUTF8 = jis_to_encodings(code)
             if codeJIS == 0 or codeSJIS == 0 or codeUTF8 == 0:
                 if (isVerbose):
-                    print(f"\t\tSkipping Code: {hex(code)} because no UTF-8 charctor assigned for this code")
+                    print(f"\t\t\tSkipping Code: {hex(code)} because no UTF-8 charctor assigned for this code")
                 continue
             unicode_char = decode_utf8(codeUTF8)  # JISコードをUnicode文字に変換
             CodeList.append([codeUTF8,codeSJIS,codeJIS,unicode_char,0,0,0])
 
             if (isVerbose):
-                print(f"\t\tJIS-Code: {hex(codeJIS)}, Shift-JIS: {hex(codeSJIS)}, UTF-8: {hex(codeUTF8)} ")
+                print(f"\t\t\tJIS-Code: {hex(codeJIS)}, Shift-JIS: {hex(codeSJIS)}, UTF-8: {hex(codeUTF8)} ")
 
     return CodeList
 
 # コードの一覧からビットマップ配列を作り、コード一覧にはビットマップのオフセット位置を追加する関数
 def convToDataAndBitmap(codeList,fontXSize,fontYSize,xOffset = 0,yOffset=-1): 
+    if (isVerbose):
+        print(f"\tconvToDataAndBitmap:: count:{len(codeList)} , Size=({fontXSize},{fontYSize}), Offset=({xOffset},{yOffset})")
+
     byteOffset = 0
     for code in codeList:
         code[6] = byteOffset
         if isVerbose:
-            print(hex(code[0]),hex(code[1]),hex(code[2]),code[3],code[6])
+            print(f"\t\tConverting UTF-8:{hex(code[0])}, SJIS:{hex(code[1])}, JIS:{hex(code[2])}, Character:\"{code[3]}\",Offset:{code[6]})")
         bitmap_image = render_glyph_to_bitmap(font,code[0], code[3], fontXSize, fontYSize ,xOffset,yOffset)
         code[4] = bitmap_image.size[0]  # 幅を取得
         code[5] = bitmap_image.size[1]  # 高さを取得
         bmpData = display_bitmap_data(bitmap_image)
         bmpList.append(bmpData)
         byteOffset += bmpData.size
+    if isVerbose:
+        print(f"\tdone. code list count = {len(codeList)} , bitmap list count = {len(bmpList)}")
     return (codeList,bmpList)
 
 def printBitArray(bitArray):
@@ -232,21 +242,67 @@ if __name__ == "__main__":
 ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそぞただちぢっつづてでとどなにぬねのはばぱひびぴふぶぷへべぺほぼぽまみむめもゃやゅゆょよらりるれろゎわゐゑをん\
 ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂッツヅテデトドナニヌネノハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロヮワヰヱヲンヴヵヶ"
 
-    parser = argparse.ArgumentParser(description="Convert Bitmap font from TrueType(.TTF) file.",
-                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    parser = argparse.ArgumentParser(description="""
+Convert Bitmap data file from TrueType(.TTF) file.
+
+This program was originally developed to create font data for displaying Japanese characters on small LCDs commonly used in hobby-electronics projects.
+As a result, the output file is currently a C++ header file intended for use with a specific program. Direct usage of this header file might be challenging; however, by extracting binary data using an editor or modifying the program, it might be possible to retrieve the data in your desired format.
+                                     """,
+#                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                        formatter_class=argparse.RawTextHelpFormatter,
     epilog='''
-    This program converts the TrueType font file specified as an argument into a C++ header file containing bitmap data of the specified size. 
-    While the header file is intended for special purposes and may not be usable directly, the bitmap data portion might still be useful.
+note:
+When converting to small-sized images, carefully choose the font file. 
+Fonts commonly used in GUI-based operating systems (such as MS-Mincho) may not convert well into clean small images.If you need to convert to a small size, it is recommended to use fonts specifically designed for small sizes, such as those with embedded bitmaps, for better results.Specify a source font file with the extension .ttf for conversion.
+
+Here is the information about free fonts suitable for small sizes, including those available for commercial use:
+- Information on Free Fonts: [http://jikasei.me/font/jf-dotfont/]
+- Direct Download Link: [https://ftp.iij.ad.jp/pub/osdn.jp/users/8/8541/jfdotfont-20150527.7z]
     '''
     )
-    parser.add_argument("font_path", type=str,help="Path to the turetype font file")
-    parser.add_argument("-n", "--name", type=str, default="", help="Name of generated structure instance")
-    parser.add_argument("-s", "--size", type=int, default=12, help="Font size")
-    parser.add_argument("-xo", "--xoffset", type=int, default=0, help="X offset")
-    parser.add_argument("-yo", "--yoffset", type=int, default=-1, help="Y offset")
-    parser.add_argument("-cs", "--codeset", choices=["ALL","LEVEL1","SCHOOL","TEST"], default="ALL", help="Code set to use.")
-    parser.add_argument("-o", "--output", type=str, default="XXX.XXX", help="Output file name")
-    parser.add_argument("-m", "--mapping", choices=["KANA","NONE"], default="KANA", help="Extra Mapping for 0x80-0xFF")
+
+
+    # コマンドライン引数の解析
+    parser.add_argument("font_path", type=str,help="Specify a source font file with the extension .ttf for conversion.")
+    parser.add_argument("-n", "--name", type=str, default="", help="""The name of the data or structure contained in the output file.
+If not specified, it will be automatically generated based on the file name or other arguments.
+                        """)
+    parser.add_argument("-s", "--size", type=int, default=12, help="""The size of the output bitmap. 
+Multibyte characters (aka. 全角) are converted into squares with equal width and height. 
+Single-byte characters (aka. 半角) are drawn with a width that is half of the size specified here.
+If not specified, the default size is 12.
+                        """)
+    parser.add_argument("-xo", "--xoffset", type=int, default=0, help="""Specifies the number of pixels to shift characters horizontally or vertically.
+When TrueType fonts are drawn, adjacent characters can appear too close, making them harder to read.
+To avoid this, characters are typically drawn with extra padding on all sides (top, bottom, left, and right).
+During data conversion, this padding might cause characters to exceed the specified size 
+(set with the -s option) or result in unnecessary blank spaces.
+Use this offset to minimize padding or to place it where desired, ensuring better control over the output.
+if not specified, the default value is 0.                        
+                        """)
+    parser.add_argument("-yo", "--yoffset", type=int, default=-1, help="Reffer to -xo option.\n If not specified, the default value is -1.\n")
+    parser.add_argument("-cs", "--codeset", choices=["ALL","LEVEL1","SCHOOL","TEST"], default="ALL", help="""Code Sets to Include in the Data\n
+- ALL: Includes JIS Level 1, Level 2 characters, various symbols, Kana, and all other supported characters.
+- LEVEL1: Includes JIS Level 1 characters, various symbols, Kana, and all other supported characters.
+- SCHOOL: Includes educational Kanji (learned by the end of 6th grade in elementary school), Hiragana, Katakana, and various symbols.
+- TEST: A smaller set of characters intended for debugging purposes. Used during testing and contains fewer characters.
+If not specified, the default value is ALL.                        
+                        """)
+    parser.add_argument("-o", "--output", type=str, default="XXX.XXX", help="""Specifies the name of the output file.
+Since the output file is a C++ header file, it is typically given the extension .h. 
+If not specified, the file name will be automatically generated based on the source file name, font size, and code set.
+""")
+    parser.add_argument("-m", "--mapping", choices=["KANA","NONE"], default="KANA", help="""Mapping Specific Character Groups to Alternative Glyphs.
+- KANA: Remap single-byte Kana code
+On many Japanese retro-computers, the single-byte codes 0xA1-0xDF (a range where international characters are defined in ISO8859)
+are typically assigned to half-width Kana characters.  
+When this option is selected, the glyphs in the range 0xA1-0xDF are mapped to the glyphs for half-width characters in 
+UTF-8 (range 0xFF61–0xFF9F).  
+- NONE: No mapping conversion is performed.
+For example, the single-byte codes 0xA1–0xDF will result in undefined glyphs following
+the ISO8859 standard, leading to unexpected character shapes.                          
+if not specified, the default value is KANA.
+""")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-i", "--image", action="store_true", help="Display truetype font image")
     args = parser.parse_args()
@@ -270,7 +326,7 @@ if __name__ == "__main__":
 
     #出力ファイルが指定されなかったら、フォントファイル名に基づいて、.hファイルを作成する
     if (output_file == "XXX.XXX"):
-        output_file = font_path.split(".")[0]+ "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".h"
+        output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".h"
 
     if (args.name == ""):
         namebase = Path(font_path).name.split(".")[0]
@@ -287,44 +343,40 @@ if __name__ == "__main__":
         structure_name = args.name
         bitmapdata_name =  args.name+"_bitmap"
 
-    #font_path = "E:\Programing\VSCode\Font\JF-Dot-Shinonome12.ttf"  # フォントファイルのパス
-    #char = "野"  # レンダリングする文字
-    #font_size = 12  # フォントサイズを指定
-    
-    # Pillowでフォントを読み込み
+   
+    # Pillowでフォントデータを読み込み。
     font =  ImageFont.truetype(font_path, font_XSize)
+
+    #フォントの範囲を定義しておく
 
     ASCII = range(0x0000,0x0100)
     JISL1 = range(0x3021,0x4f54)
     JISL2 = range(0x5021,0x7427)
     JISKIGOU = range(0x2121,0x2F7E)
     
-    test1 = range(0x0041,0x0042) 
+    # デバッグ用の特別なフォント範囲
+    test1 = range(0x00A0,0x00A5) 
     test2 = range(0x212F,0x2130)
-    #test = range(0x41,0x42)
-    
-    codeList = []
 
-    if isVerbose :
-        print(f"Get Code tables....")
-
+    #指定されたフォントセットに基づいて、文字コードを変換してUTF-8/SJIS/JISコードのリスト配列にしておく
+    codeList = []                           # コードのリスト。
     if (code_set == "ALL"):
         if isVerbose :
-            print(f"Get Code tables for ASCII/JISL1/JISL2/JISKIGOU....")
+            print(f"Generating Code tables for ASCII/JISL1/JISL2/JISKIGOU....")
         codeList += getCodeTbl(ASCII)
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISL2)
         codeList += getCodeTbl(JISKIGOU)   
     elif (code_set == "LEVEL1"):
         if isVerbose :
-            print(f"Get Code tables for ASCII/JISL1/JISKIGOU....")
+            print(f"Generating Code tables for ASCII/JISL1/JISKIGOU....")
         codeList += getCodeTbl(ASCII)
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISKIGOU)
     elif (code_set == "SCHOOL"):
         #教育漢字の場合、少し複雑。とりあえずJISL1のテーブルを作って、そこから該当しないものを削除していくことにする。
         if isVerbose :
-            print(f"Get Code tables for ASCII/JISL1/JISKIGOU....")
+            print(f"Generating Code tables for ASCII/JISL1/JISKIGOU....")
         codeList += getCodeTbl(ASCII)
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISKIGOU)
@@ -338,30 +390,31 @@ if __name__ == "__main__":
                 codeList.remove(d)
     elif (code_set == "TEST"):
         if isVerbose :
-            print(f"Test Mode")
+            print(f"Generating Code tables for debugging....")
         codeList += getCodeTbl(test1)
         codeList += getCodeTbl(test2)
+    if isVerbose:
+        print("done.")
 
 
-
+    # コードセットを、最初の要素（UTF-8)でソートする。こうしないと、後から検索するときにバイナリサーチで検索ができないため
+    if isVerbose:
+        print(f"Sorting code list with UTF-8...." )
     codeList.sort(key=lambda x: x[0])
+    if isVerbose:
+        print("done.")
 
-
-
+    #　コードセットテーブルを、ビットマップデータに変換する。同時に、コードセットテーブル内のXサイズ、Yサイズ、ビットマップデータを更新する
+    if isVerbose:
+        print(f"Generating bitmap data....")
     bmpList = []
-    print(len(codeList))
-    
-
-
     codeList , bmpList = convToDataAndBitmap(codeList,  font_XSize,font_YSize,x_offset,y_offset)
+    if isVerbose:
+        print("done.")
 
-    """
-    for code in codeList:
-        print(hex(code[0]),hex(code[1]),hex(code[2]),code[3],code[4],code[5],code[6])
-        ArraySizeX = round(code[4]/8) * code[5]
-        printBitArray(bmpList[code[6]])
-    """
-    
+    if isVerbose:
+        print(f"Generating output file: {output_file}....")
+
     with open(output_file, "w", encoding="utf-8") as f:
         strOutput = ""
         strOutput +="// This file is auto generated by font.py\n"
@@ -442,7 +495,8 @@ if __name__ == "__main__":
         f.write("};\n")
         if isVerbose:
             print ("};")
-        print()
+    if isVerbose:
+        print(f"done.")
 
-        print(f"Output file: {output_file} created.")
+    print(f"Success.. Output file: {output_file} created.")
 

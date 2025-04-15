@@ -19,12 +19,12 @@
             "console": "integratedTerminal",
             "args":[
                 "-s","12",
-                "-cs","SCHOOL",
+                "-cs","ALL",
 //                "-m" , "NONE",
-                "-v",
+//                "-v",
 //                "-i",
 //                "test"
-                "JF-Dot-Shinonome12.ttf" 
+                ".\\JF-Dot-Shinonome12.ttf" 
             ]
 
         }
