@@ -472,7 +472,17 @@ If not specified, the default value is ALLZERO.
                 strWkLine += ","
             else:
                 strWkLine += " "
-            strWkLine += f"\t// {code[3]}\n"
+            # 最後に、どの文字コードなのかを示すため、コメントを付ける。ただ、バックスラッシュ記号が // の中にあると、
+            # 継続行として扱われてしまい、次の行がコメントになってしまうので、表示文字はダブルクォートで囲む。
+            # この動作って、C++の仕様？と思って調べたら、仕様だった。
+            # なので、
+            #   char *fn;    //　読み込み元 C:\hoge\
+            #   fn = "moge.txt";
+            # というプログラムは、誤動作する。
+            #   char *fn;    //　読み込み元 "C:\hoge\"
+            # だと、行末がバックスラッシュにならないので問題ない。
+            # //を継続行にしたい奴っているの？？？もはや仕様のバグ・・・
+            strWkLine += f"\t// \"{code[3]}\"\n"
             strOutput += strWkLine
         strOutput += "};\n"
 
