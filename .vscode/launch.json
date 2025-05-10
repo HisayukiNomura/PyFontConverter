@@ -1,7 +1,4 @@
 {
-    // IntelliSense を使用して利用可能な属性を学べます。
-    // 既存の属性の説明をホバーして表示します。
-    // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
         {
@@ -10,25 +7,53 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
-        }
+        },
         {
-            "name": "Python デバッガー: 引数指定",
+            "name": "デバッガー: Cソース出力",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "args":[
-                "-s","12",
-                "-cs","ALL",
+                "-s","14",
+                "-cs","TEST",
 //                "-m" , "NONE",
-//                "-v",
+                "-v",
 //                "-i",
 //                "test"
-                ".\\JF-Dot-Shinonome12.ttf" 
+                "JF-Dot-Shinonome14.ttf" 
             ]
-
-        }
-
+        },
+        { 
+            "name": "デバッガー: バイナリ出力",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args":[
+                "-s","14",
+                "-cs","TEST",
+                "-v",
+                "-t" , "PBinary",
+                "JF-Dot-Shinonome14.ttf" 
+            ]
+    
+        },
+        { 
+            "name": "デバッガー: Python出力",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args":[
+                "-s","14",
+                "-cs","TEST",
+                "-v",
+                "-t" , "Python",
+                "JF-Dot-Shinonome14.ttf" 
+            ]
+    
+        }        
     ]
     
 }
