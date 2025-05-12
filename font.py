@@ -366,9 +366,8 @@ def Output2Python(OutFileName, codeList , bitmapList) :
     strOutput = ""
     if isVerbose:
         print(f"Generating output file: {OutFileName}....")
-        cmd_line = " ".join(sys.argv)  # 引数をスペース区切りの文字列として取得
-        cmd_line = os.path.basename(cmd_line)
-
+    cmd_line = " ".join(sys.argv)  # 引数をスペース区切りの文字列として取得
+    cmd_line = os.path.basename(cmd_line)
 
 
     with open(OutFileName, "w", encoding="utf-8") as f:
@@ -382,6 +381,10 @@ def Output2Python(OutFileName, codeList , bitmapList) :
         strOutput +="# Character count: " + str(len(codeList)) + "\n"
         strOutput +=f"# data size:{total_size(bitmapList):} bytes\n"
         strOutput +=f"# \n"
+        strOutput += "import struct\n"
+        strOutput +=f"\n"
+
+
 
         f.write(strOutput)
         if isVerbose:
@@ -396,7 +399,8 @@ def Output2Python(OutFileName, codeList , bitmapList) :
         elif (isEndMark == "ALLMAX"):
             codeList.append([0xFFFFFFFF,0xFFFF,0xFFFF,"",0,0,0])
         strOutput = ""
-        strOutput += f"{structure_name} = b\"\".join(struct.pack(\"<IHHBBI\", *data) for data in [\n"
+        strOutput += f"code = b\"\".join(struct.pack(\"<IHHBBI\", *data) for data in [\n"
+#        strOutput += f"{structure_name} = b\"\".join(struct.pack(\"<IHHBBI\", *data) for data in [\n"
         for i, code in enumerate(codeList):
             strWkLine = "("
             strWkLine += f"0x{hex(code[0])[2:].zfill(8)}" + ", "
@@ -414,18 +418,9 @@ def Output2Python(OutFileName, codeList , bitmapList) :
             print(strOutput,end="")
             print()
 
-        """
-bmpData = bytes([
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-])
-        """
         strOutput = ""
-        strOutput += f"{structure_name}_BMP = bytes(["
+        #strOutput += f"{structure_name}_BMP = bytes(["
+        strOutput += f"bitmap = bytes(["
         f.write(strOutput+"\n")
         if isVerbose:
             print(strOutput)
@@ -511,6 +506,7 @@ def Output2BDF(OutFileName, codeList , bitmapList) :
  
 
 if __name__ == "__main__":
+
     
     #教育漢字の一覧
     KyouikuKanji = "一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六\
@@ -564,13 +560,16 @@ Use this offset to minimize padding or to place it where desired, ensuring bette
 if not specified, the default value is 0.                        
                         """)
     parser.add_argument("-yo", "--yoffset", type=int, default=-1, help="Reffer to -xo option.\n If not specified, the default value is -1.\n")
-    parser.add_argument("-cs", "--codeset", choices=["ALL","LEVEL1","SCHOOL","TEST"], default="ALL", help="""Code Sets to Include in the Data\n
+    parser.add_argument("-cs", "--codeset", choices=["ALL","LEVEL1","SCHOOL","CUSTOM","TEST"], default="ALL", help="""Code Sets to Include in the Data\n
 - ALL: Includes JIS Level 1, Level 2 characters, various symbols, Kana, and all other supported characters.
 - LEVEL1: Includes JIS Level 1 characters, various symbols, Kana, and all other supported characters.
 - SCHOOL: Includes educational Kanji (learned by the end of 6th grade in elementary school), Hiragana, Katakana, and various symbols.
+- CUSTOM: Specify the characters used in a text file with the '-cf' argument.
 - TEST: A smaller set of characters intended for debugging purposes. Used during testing and contains fewer characters.
 If not specified, the default value is ALL.                        
                         """)
+    parser.add_argument("-cf", "--charfile", type=str, default="", help="Specify the characters include in output file.")
+
     parser.add_argument("-o", "--output", type=str, default="XXX.XXX", help="""Specifies the name of the output file.
 Since the output file is a C++ header file, it is typically given the extension .h. 
 If not specified, the file name will be automatically generated based on the source file name, font size, and code set.
@@ -597,7 +596,8 @@ If not specified, the default value is ALLZERO.
     parser.add_argument("-t","--outtype" , choices=["CData","PBinary","Python"], default="CData", help="""Specify the format of the output font.  
 CData: The output is generated as a C-language struct and a bitmap array.  Binary: The output is generated in binary file format.
 If not specified, the default value is CData.                        
-""")    
+""") 
+    parser.add_argument("-fr", "--filereplace", action="store_true", help="Replace inappropriate characters in output file names (such as spaces and mathematical symbols) with underscores.")   
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-i", "--image", action="store_true", help="Display truetype font image")
     args = parser.parse_args()
@@ -613,6 +613,9 @@ If not specified, the default value is CData.
     isImage = args.image
     isEndMark = args.endmark
     outFormat = args.outtype
+    isReplace = args.filereplace
+    charfile = args.charfile
+
 
 
 
@@ -621,6 +624,14 @@ If not specified, the default value is CData.
     #入力ファイルが　”test" なら、テスト用のデータを読み込む
     if (font_path == "test"):
         font_path = "E:\Programing\VSCode\Font\JF-Dot-Shinonome12.ttf"
+    
+    if (code_set == "CUSTOM"):
+        if charfile == "":
+            print("Error: -cf option is required when -cs CUSTOM is specified.")
+            sys.exit(1)
+        if os.path.exists(charfile) == False:
+            print(f"Error: -cf option file {charfile} does not exist.")
+            sys.exit(1)
 
     #出力ファイルが指定されなかったら、フォントファイル名に基づいて、.hファイルを作成する
     if (output_file == "XXX.XXX"):
@@ -630,6 +641,15 @@ If not specified, the default value is CData.
             output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set
         elif (outFormat == "Python"):
             output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".py"
+
+    #出力ファイル名に不適切な文字が含まれている場合、アンダースコアに置換する
+    if (isReplace):
+        # 置換対象の文字リスト
+        invalid_chars = {"-"," ","+", "-", "*" ,"/", " ", " ", "(", ")", "[", "]", "{", "}", ":", ";", ",",  "<", ">", "?", "!", "@", "#", "$", "%", "^", "&", "~", "`"}
+        # 置換後の文字列を作成
+        cleaned_name = "".join("_" if char in invalid_chars else char for char in output_file)
+        output_file = cleaned_name
+
 
     if (args.name == ""):
         namebase = Path(font_path).name.split(".")[0]
@@ -691,6 +711,29 @@ If not specified, the default value is CData.
                 continue
             if d[3] not in KyouikuKanji:    #教育漢字に含まれないものは削除する
                 codeList.remove(d)
+    elif (code_set == "CUSTOM"):
+        # 教育漢字と同じ方法で、ALLのセットから使用しないものを削除していく。効率は大変悪くなるが仕方ない。
+        if isVerbose :
+            print(f"Reading code file {charfile}....")
+        with open(charfile, "r", encoding="utf-8") as file:
+            content = file.read().replace("\n", "")  # 改行を削除
+        if isVerbose :
+            print(f"The output contains the following characters")
+            print(f"{content}")
+        if isVerbose :
+            print(f"Generating Code tables for ASCII/JISL1/JISKIGOU....")
+        codeList += getCodeTbl(ASCII)
+        codeList += getCodeTbl(JISL1)
+        codeList += getCodeTbl(JISKIGOU)
+
+        if isVerbose :
+            print(f"Removing unused characters....")
+        for d in codeList :
+            if d[0] <= 0xFF:            #１バイト文字は含める
+                continue
+            if d[3] not in content:    #教育漢字に含まれないものは削除する
+                codeList.remove(d)
+
     elif (code_set == "TEST"):
         if isVerbose :
             print(f"Generating Code tables for debugging....")

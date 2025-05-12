@@ -21,7 +21,7 @@
                 "-v",
 //                "-i",
 //                "test"
-                "JF-Dot-Shinonome14.ttf" 
+                "FONTDATA\\JF-Dot-Shinonome14.ttf" 
             ]
         },
         { 
@@ -35,11 +35,12 @@
                 "-cs","TEST",
                 "-v",
                 "-t" , "PBinary",
-                "JF-Dot-Shinonome14.ttf" 
+                "FONTDATA\\JF-Dot-Shinonome14.ttf" 
             ]
     
         },
         { 
+            "cwd": "${workspaceFolder}/FONTDATA",
             "name": "デバッガー: Python出力",
             "type": "debugpy",
             "request": "launch",
@@ -47,13 +48,32 @@
             "console": "integratedTerminal",
             "args":[
                 "-s","14",
-                "-cs","TEST",
+                "-cs","LEVEL1",
                 "-v",
                 "-t" , "Python",
+                "-fr",
                 "JF-Dot-Shinonome14.ttf" 
             ]
     
-        }        
+        },
+        { 
+            "cwd": "${workspaceFolder}/FONTDATA",
+            "name": "デバッガー: Python出力・小型セット",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args":[
+                "-s","14",
+                "-cs","CUSTOM",
+                "-cf","smallset.txt",
+                "-v",
+                "-t" , "Python",
+                "-fr",
+                "JF-Dot-Shinonome14.ttf" 
+            ]
+    
+        }             
     ]
     
 }
