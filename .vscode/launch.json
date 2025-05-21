@@ -64,13 +64,14 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args":[
-                "-s","14",
-                "-cs","CUSTOM",
+                "-i",
+                "-s","24",
+                "-cs","TEST",
                 "-cf","smallset.txt",
                 "-v",
                 "-t" , "Python",
                 "-fr",
-                "JF-Dot-Shinonome14.ttf" 
+                "ipag.ttf" 
             ]
     
         }             

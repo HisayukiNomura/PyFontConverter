@@ -733,6 +733,27 @@ If not specified, the default value is CData.
                 continue
             if d[3] not in content:    #教育漢字に含まれないものは削除する
                 codeList.remove(d)
+    elif (code_set == "CUSTOM2"):
+        # 教育漢字と同じ方法で、ALLのセットから使用しないものを削除していく。CUSTOMと違い、１バイト文字も削除対象にする。
+        # 本来の利用目的は１バイト文字は２５６個あるという前提で作られている（キーでの検索ではなく直接計算でビットマップ画像を求めるため）ので、これは主にデバッグ用になる
+        if isVerbose :
+            print(f"Reading code file {charfile}....")
+        with open(charfile, "r", encoding="utf-8") as file:
+            content = file.read().replace("\n", "")  # 改行を削除
+        if isVerbose :
+            print(f"The output contains the following characters")
+            print(f"{content}")
+        if isVerbose :
+            print(f"Generating Code tables for ASCII/JISL1/JISKIGOU....")
+        codeList += getCodeTbl(ASCII)
+        codeList += getCodeTbl(JISL1)
+        codeList += getCodeTbl(JISKIGOU)
+
+        if isVerbose :
+            print(f"Removing unused characters....")
+        for d in codeList :
+            if d[3] not in content:    #教育漢字に含まれないものは削除する
+                codeList.remove(d)
 
     elif (code_set == "TEST"):
         if isVerbose :
