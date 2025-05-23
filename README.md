@@ -12,30 +12,33 @@
 python font.py [オプション] フォントファイル(ttf)
 ```
 
-## 主なコマンドラインオプション
 
-| オプション | 説明 |
-|------------|------|
-| font_path  | 変換元のTrueTypeフォントファイル（.ttf）を指定（必須） |
-| -n, --name | 出力データや構造体の名前を指定（省略時は自動生成） |
-| -s, --size | 出力ビットマップのサイズ（省略時は12） |
-| -xo, --xoffset | 文字の横方向オフセット（省略時は0） |
-| -yo, --yoffset | 文字の縦方向オフセット（省略時は-1） |
-| -cs, --codeset | 収録文字セット（ALL, LEVEL1, SCHOOL, CUSTOM, TEST） |
-| -cf, --charfile | CUSTOM指定時に使用する文字リストファイル |
-| -o, --output | 出力ファイル名（省略時は自動生成） |
-| -m, --mapping | 特定文字グループのマッピング（KANA, NONE） |
-| -em, --endmark | データ終端マークの種類（ALLZERO, ALLMAX, NONE） |
-| -t, --outtype | 出力フォーマット（CData, PBinary, Python） |
-| -fr, --filereplace | ファイル名の不適切文字をアンダースコアに置換 |
-| -v, --verbose | 詳細出力 |
-| -i, --image | フォント画像を表示 |
+### 主なオプションとデフォルト値
+
+| オプション | 説明 | デフォルト値 |
+|------------|------|-------------|
+| font_path  | 変換元のTrueTypeフォントファイル（.ttf）を指定（必須） | - |
+| -n, --name | 出力データや構造体の名前を指定 | 自動生成 |
+| -s, --size | 出力ビットマップのサイズ | 12 |
+| -xo, --xoffset | 文字の横方向オフセット | 0 |
+| -yo, --yoffset | 文字の縦方向オフセット | -1 |
+| -cs, --codeset | 収録文字セット（ALL, LEVEL1, SCHOOL, CUSTOM, TEST） | ALL |
+| -cf, --charfile | CUSTOM指定時に使用する文字リストファイル | - |
+| -o, --output | 出力ファイル名 | 自動生成 |
+| -m, --mapping | 特定文字グループのマッピング（KANA, NONE） | KANA |
+| -em, --endmark | データ終端マークの種類（ALLZERO, ALLMAX, NONE） | ALLZERO |
+| -t, --outtype | 出力フォーマット（CData, PBinary, Python） | CData |
+| -fr, --filereplace | ファイル名の不適切文字をアンダースコアに置換 | - |
+| -v, --verbose | 詳細出力 | - |
+| -i, --image | フォント画像を表示 | - |
 
 #### 例
 
 ```
 python font.py JF-Dot-Shinonome12.ttf -s 12 -cs SCHOOL -o MyFont.h
 ```
+　JF-Dot-Shinonome12.ttf　というTrueTypeフォントを、12x12ドットに変換します。教育漢字だけを含んだC言語のヘッダファイルとして、MyFont.hという名前で出力します。
+
 
 ### 注意事項
 
