@@ -1,4 +1,3 @@
-
 from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -505,6 +504,107 @@ def Output2BDF(OutFileName, codeList , bitmapList) :
         f.write(strOutput)
  
 
+def Output2FONTX2(OutFileName, codeList, bitmapList):
+    """
+    FONTX2形式で全角用・半角用を別々のファイルに出力する（文字コードはShiftJIS、エンディアン逆）
+    ヘッダは全角で17バイト（+コードブロック数+テーブル）、半角で16バイト
+    コードリスト・ビットマップリストはSJIS順に並び替えて出力
+    """
+    if isVerbose:
+        print(f"Generating FONTX2 output files: {OutFileName}_zen.fnt, {OutFileName}_han.fnt ....")
+
+    zen_file = OutFileName + "_zen.fnt"
+    han_file = OutFileName + "_han.fnt"
+
+    # コードブロックテーブルを作成（全角用のみ）
+    def make_code_blocks(codeList):
+        blocks = []
+        prev = None
+        start = None
+        for code in sorted([c[1] for c in codeList if c[1] > 0xFF]):
+            if start is None:
+                start = code
+                prev = code
+            elif code == prev + 1:
+                prev = code
+            else:
+                blocks.append((start, prev))
+                start = code
+                prev = code
+        if start is not None:
+            blocks.append((start, prev))
+        return blocks
+
+    def make_header_zen(font_name, width, height, nb):
+        header = bytearray(18 + nb * 4)
+        header[0:6] = b'FONTX2'
+        name_bytes = Path(font_name).stem.encode('ascii', errors='replace')[:8]
+        header[6:6+len(name_bytes)] = name_bytes
+        header[14] = width
+        header[15] = height
+        header[16] = 1  # 1:シフトJIS
+        header[17] = nb  # コードブロック数
+        # コードブロックテーブルは18バイト目以降
+        return header
+
+    def make_header_han(font_name, width, height):
+        header = bytearray(17)
+        header[0:6] = b'FONTX2'
+        name_bytes = Path(font_name).stem.encode('ascii', errors='replace')[:8]
+        header[6:6+len(name_bytes)] = name_bytes
+        header[14] = width
+        header[15] = height
+        # 16バイト目: 0=ANK(半角), 1=全角
+        header[16] = 0
+        return header
+
+    # SJIS順に並び替え
+    sjis_sorted = sorted(enumerate(codeList), key=lambda x: x[1][1])
+    sorted_codeList = [x[1] for x in sjis_sorted]
+    sorted_bitmapList = [bitmapList[x[0]] for x in sjis_sorted]
+
+    # 半角用ファイル出力（ShiftJISコードを使う、エンディアン逆、ヘッダ17バイト）
+    with open(han_file, "wb") as f_han:
+        f_han.write(make_header_han(font_path, font_XSize // 2, font_YSize))
+        for idx, code in enumerate(sorted_codeList):
+            sjis_val = code[1]
+            width = code[4]
+            bmp = sorted_bitmapList[idx]
+            if sjis_val <= 0xFF:
+                # f_han.write(bytes([0x00, sjis_val & 0xFF]))  # FONTX2仕様では不要なので削除
+                bytes_per_row = max(1, (width + 7) // 8)
+                for row in bmp:
+                    f_han.write(bytes(row[:bytes_per_row]))
+        if isVerbose:
+            print(f"FONTX2 han data written.")
+
+    # 全角用ファイル出力（ShiftJISコードを使う、エンディアン逆、ヘッダ18+4*NBバイト）
+    code_blocks = make_code_blocks(sorted_codeList)
+    nb = len(code_blocks)
+    header = make_header_zen(font_path, font_XSize, font_YSize, nb)
+    # コードブロックテーブルを格納
+    for i, (start, end) in enumerate(code_blocks):
+        base = 18 + i*4
+        header[base + 0] = start & 0xFF
+        header[base + 1] = (start >> 8) & 0xFF
+        header[base + 2] = end & 0xFF
+        header[base + 3] = (end >> 8) & 0xFF
+
+    with open(zen_file, "wb") as f_zen:
+        f_zen.write(header)
+        for idx, code in enumerate(sorted_codeList):
+            sjis_val = code[1]
+            width = code[4]
+            if sjis_val > 0xFF:
+                bmp = sorted_bitmapList[idx]
+                # f_zen.write(bytes([0x01, sjis_val & 0xFF, (sjis_val >> 8) & 0xFF]))  # FONTX2仕様上不要なので削除
+                bytes_per_row = max(1, (width + 7) // 8)
+                for row in bmp:
+                    f_zen.write(bytes(row[:bytes_per_row]))
+        if isVerbose:
+            print(f"FONTX2 zen data written.")
+
+
 if __name__ == "__main__":
 
     
@@ -593,8 +693,9 @@ Defines the type of end mark to append at the end of the data. A special line in
 If not specified, the default value is ALLZERO.                        
 """)
 
-    parser.add_argument("-t","--outtype" , choices=["CData","PBinary","Python"], default="CData", help="""Specify the format of the output font.  
+    parser.add_argument("-t","--outtype" , choices=["CData","PBinary","Python", "FONTX2"], default="CData", help="""Specify the format of the output font.  
 CData: The output is generated as a C-language struct and a bitmap array.  Binary: The output is generated in binary file format.
+FONTX2: The output is generated in FONTX2 format.
 If not specified, the default value is CData.                        
 """) 
     parser.add_argument("-fr", "--filereplace", action="store_true", help="Replace inappropriate characters in output file names (such as spaces and mathematical symbols) with underscores.")   
@@ -623,7 +724,7 @@ If not specified, the default value is CData.
 
     #入力ファイルが　”test" なら、テスト用のデータを読み込む
     if (font_path == "test"):
-        font_path = "E:\Programing\VSCode\Font\JF-Dot-Shinonome12.ttf"
+        font_path = "E:\\Programing\\VSCode\\Font\\JF-Dot-Shinonome12.ttf"
     
     if (code_set == "CUSTOM"):
         if charfile == "":
@@ -641,6 +742,8 @@ If not specified, the default value is CData.
             output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set
         elif (outFormat == "Python"):
             output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".py"
+        elif (outFormat == "FONTX2"):
+            output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".fnt"
 
     #出力ファイル名に不適切な文字が含まれている場合、アンダースコアに置換する
     if (isReplace):
@@ -678,8 +781,8 @@ If not specified, the default value is CData.
     JISKIGOU = range(0x2121,0x2F7E)
     
     # デバッグ用の特別なフォント範囲
-    test1 = range(0x0041,0x0042) 
-    test2 = range(0x443E,0x443F)
+    test1 = range(0x0041,0x0043) 
+    test2 = range(0x443E,0x4440)
 
     #指定されたフォントセットに基づいて、文字コードを変換してUTF-8/SJIS/JISコードのリスト配列にしておく
     codeList = []                           # コードのリスト。
@@ -785,7 +888,8 @@ If not specified, the default value is CData.
         Output2Binary(output_file,codeList,bmpList)
     elif outFormat == "Python" :
         Output2Python(output_file,codeList,bmpList)
-    
+    elif outFormat == "FONTX2":
+        Output2FONTX2(output_file, codeList, bmpList)
 
     print(f"Success.. Output file: {output_file} created.")
 
