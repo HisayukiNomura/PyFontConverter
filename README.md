@@ -3,6 +3,13 @@
 現在のところ、C言語、Pythonのソースコード、バイナリ、FontXの出力が可能です。
 
 
+## 準備
+必要なパッケージをインストールします。
+
+```
+pip install -r requirements.txt
+```
+
 ## PyFontConverterの使い方
 
 1. [PyFontConverterのGitHub](https://github.com/HisayukiNomura/PyFontConverter) から `font.py` をダウンロードします。
