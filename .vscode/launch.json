@@ -17,7 +17,7 @@
             "args":[
                 "-s","14",
                 "-cs","TEST",
-//                "-m" , "NONE",
+                "-m" , "KANA",
                 "-v",
 //                "-i",
 //                "test"
@@ -101,7 +101,7 @@
             "console": "integratedTerminal",
             "args":[
                 "-s","24",
-                "-cs","ALL",
+                "-cs","TEST",
 //                "-m" , "NONE",
                 "-v",
                 "-t", "FONTX2",
