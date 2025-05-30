@@ -178,6 +178,79 @@ const KanjiData*　FindKanji(uint32_t unicode) {
 ```
 
 
+### Pythonデータの場合
+
+Pythonデータについても、Cのヘッダと基本的には同じ構造をしています。
+
+次のように、struct を使ってIHHBBIとしてパックされたコードと、ビットマップパターンに別れています。
+
+```
+import struct
+
+code = b"".join(struct.pack("<IHHBBI", *data) for data in [
+(0x00000000, 0x0000, 0x0000, 12, 24, 0x00000000),	# "0x00"
+        :
+(0x00e79bb4, 0x92bc, 0x443e, 24, 24, 0x00047b20),	# "直"
+(0x00e79bb8, 0x918a, 0x416a, 24, 24, 0x00047b68),	# "相"
+(0x00e79bbb, 0xe1bb, 0x623d, 24, 24, 0x00047bb0),	# "盻"
+
+bitmap = bytes([
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,…
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,…
+　　：
+```
+
+
+このデータを、バイナリサーチで検索するプログラムは次のようになります。
+
+```
+import struct
+import ipag_24x24_ALL
+# バイナリデータを読み込む
+
+def binary_search(target_key,size):
+    left =0
+    right = len(ipag_24x24_ALL.code) // record_size - 1  # 範囲を初期化
+
+    while left <= right:
+        mid = (left + right) // 2  # 中央のインデックスを求める
+        start = mid * record_size  # 該当データの開始位置
+        record = struct.unpack("<IHHBBI", ipag_24x24_ALL.code[start:start+record_size])  # レコードを展開
+
+        if record[0] == target_key:
+            return record  # 見つかった！
+        elif record[0] < target_key:
+            left = mid + 1  # 右側を探索
+        else:
+            right = mid - 1  # 左側を探索
+
+    return None  # 見つからなかった場合
+
+
+record_size = struct.calcsize("<IHHBBI")
+key = 0x00e79bb4  #検索する文字コード。UTF-8の「直」
+record = binary_search(key,record_size)
+
+print(record if record else "レコードが見つかりません")
+
+```
+
+メモリが潤沢にある場合、こうしたバイナリサーチを自分で組むのではなく、
+
+```
+record_size = struct.calcsize("<IHHBBI")
+
+records_dict = {
+    struct.unpack("<IHHBBI", code[i:i+record_size])[0]: struct.unpack("<IHHBBI", code[i:i+record_size])
+    for i in range(0, len(code), record_size)
+}
+```
+のように辞書を作成し、```record = records_dict.get(key, "レコードが見つかりません")```　などとアクセスしたほうが見通しの良いコードになるかもしれません。（速度はわからないが）
+
+***注意***
+元々、このpythonプログラムはRaspberry PI PicoのMicroPythonで、漢字情報を持ち、画面に表示させる為に作成した。しかし16x16ドットで教育漢字だけでもメモリが足りなかった。Pythonのプログラムではpythonのプログラムでデータを持ち、フラッシュメモリに書き込んでもこれを実行するときにメモリに乗せる必要がある。プログラムメモリは1MBytesと、漢字を入れるには足りるが、RAMが256MBytesしかないため事実上使用できなかった。
+
+マイコンでの使用は事実上困難だと思われる。
 
 ### 注意事項
 

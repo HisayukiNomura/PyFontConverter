@@ -157,6 +157,70 @@ const KanjiData* FindKanji(uint32_t unicode) {
 }
 ```
 
+### How to Use with Python Data
+
+The Python data format is fundamentally similar to the C header format. The code table is packed using struct as IHHBBI, and the bitmap pattern is stored separately.
+
+Example:
+
+```python
+import struct
+
+code = b"".join(struct.pack("<IHHBBI", *data) for data in [
+    (0x00000000, 0x0000, 0x0000, 12, 24, 0x00000000),  # "0x00"
+    # ...
+    (0x00e79bb4, 0x92bc, 0x443e, 24, 24, 0x00047b20),  # "直"
+    (0x00e79bb8, 0x918a, 0x416a, 24, 24, 0x00047b68),  # "相"
+    (0x00e79bbb, 0xe1bb, 0x623d, 24, 24, 0x00047bb0),  # "盻"
+])
+
+bitmap = bytes([
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, # ...
+    # ...
+])
+```
+
+To search the code table using binary search:
+
+```python
+import struct
+import ipag_24x24_ALL  # Example: import the generated font data
+
+def binary_search(target_key, record_size):
+    left = 0
+    right = len(ipag_24x24_ALL.code) // record_size - 1
+    while left <= right:
+        mid = (left + right) // 2
+        start = mid * record_size
+        record = struct.unpack("<IHHBBI", ipag_24x24_ALL.code[start:start+record_size])
+        if record[0] == target_key:
+            return record
+        elif record[0] < target_key:
+            left = mid + 1
+        else:
+            right = mid - 1
+    return None
+
+record_size = struct.calcsize("<IHHBBI")
+key = 0x00e79bb4  # Unicode for '直'
+record = binary_search(key, record_size)
+print(record if record else "Record not found")
+```
+
+If you have enough memory, you can create a dictionary for easier access:
+
+```python
+record_size = struct.calcsize("<IHHBBI")
+records_dict = {
+    struct.unpack("<IHHBBI", code[i:i+record_size])[0]: struct.unpack("<IHHBBI", code[i:i+record_size])
+    for i in range(0, len(code), record_size)
+}
+record = records_dict.get(key, "Record not found")
+```
+
+**Note:**
+Originally, this Python program was designed for MicroPython on Raspberry Pi Pico to display Kanji on a screen. However, even with educational Kanji at 16x16 dots, memory was insufficient. The data must be loaded into memory to use it, and while the program memory is 1MB, RAM is only 256KB, making practical use difficult on microcontrollers.
+
 
 ## License
 
