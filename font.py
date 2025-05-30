@@ -1,3 +1,26 @@
+# -*- coding: utf-8 -*-
+#
+# MIT License
+# Copyright (c) 2025 Hisayuki Nomura
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
@@ -65,8 +88,10 @@ Here is the information about free fonts suitable for small sizes, including tho
             "FONTX2: Outputs in FONTX2 format (alf-width and full-width characters are output as separate files." \
             "If not specified, the default is CData.", 
 "--filereplace" : "Replace inappropriate characters in output file names (such as spaces and mathematical symbols) with underscores.",
+"--bdf-split" : "If set with -t BDF, outputs half-width and full-width characters as separate BDF files.",
 "--verbose" : "Enable verbose output mode.\n",
 "--image" : "To assist with debugging, the screen displays the characters being converted during execution. This is useful when adjusting xoffset and yoffset\n",
+"--encoding" : "Encoding to use for the output file. " ,
 "err_codeblock" : "Error: Block number overflow. In FONTX, consecutive character codes are managed as blocks in a table and maximum block number is 256.\n" 
                     "This character set required {} of blocks and unable to represent in FONTX2 format." 
                     "Change the code set specified with -cs or output in a format other than FONTX2." ,
@@ -76,6 +101,11 @@ Here is the information about free fonts suitable for small sizes, including tho
 "err_decordingerror":  "Error: Decorging error for {} : {}",
 "err_fontfilenotexist" : "Error: The specified font file {} does not exist. Please check the path and file name.",
 "err_fontfileinvalid" : "Error: Failed to load the specified font file {}. Exception: {}",
+"err_logicerror" : "Error: Logic error. This should not happen.  Please report this issue to the developer. Line:{} - Msg:{}",
+"err_notsupportedencoding" : "Error: The specified encoding {} is not supported.",
+"err_cannotuseenc" : "Error: The specified encoding {} cannot use in {}.",
+"err_bdfsplitonlybdf": "Error: The --bdf-split option can only be used with the BDF output type (-t BDF).",
+
 
 "log_gencodetbl" : "Generating code table for {} characters....",
 "log_removingcodetbl" : "Removing non-Kyouiku-kanji characters....",
@@ -157,8 +187,10 @@ GUIベースのオペレーティングシステム（MS-Minchoなど）で一�
             "FONTX2: FONTX2形式で出力（半角文字と全角文字は別々のファイルとして出力）。\n" \
             "指定しない場合、デフォルトはCDataです。",
 "--filereplace" : "出力ファイル名の不適切な文字（スペースや数学記号など）をアンダースコアに置き換えます。",
+"--bdf-split" : "BDF形式で出力する場合、半角文字と全角文字を別々のBDFファイルとして出力します。",
 "--verbose" : "出力の詳細を表示します。\n" ,
 "--image": " デバッグのため、実行中に変換している文字の画面を表示させます。xoffsetやyoffsetの調整を行う際に便利です。\n" ,
+"--encoding" : "使用されるエンコーディングを指定します。 " ,
 "err_codeblock" : "エラー: ブロック番号のオーバーフローです。FONTXでは、連続する文字コードはテーブル内のブロックとして管理され、最大ブロック数は256です。\n" \
                 "この文字セットでは{}のブロックが必要で、FONTX2形式で表現できません。\n" \
                 "コードセットを変更するか、FONTX2以外の形式で出力してください。",
@@ -168,6 +200,10 @@ GUIベースのオペレーティングシステム（MS-Minchoなど）で一�
 "err_decordingerror":  "エラー: 文字 {} のデコードに失敗しました: {}",
 "err_fontfilenotexist" : "エラー: 指定されたフォントファイル {} が存在しません。パスとファイル名を確認してください。",
 "err_fontfileinvalid" : "エラー: 指定されたフォントファイル {} の読み込みに失敗しました。例外：{}",
+"err_logicerror" : "エラー: ロジックエラーです。これは発生しないはずです。開発者にこの問題を報告してください。行:{} - メッセージ:{}",
+"err_notsupportedencoding" : "エラー: 指定されたエンコーディング {} はサポートされていません。",
+"err_cannotuseenc" : "エラー: 指定されたエンコーディング {} は {} では使用できません。",
+"err_bdfsplitonlybdf": "エラー: --bdf-splitオプションはBDF出力タイプ（-t BDF）でのみ使用できます。",
 
 "log_gencodetbl" : "{}文字のコードテーブルを生成しています....",
 "log_removingcodetbl" : "教育漢字以外の文字を削除しています....",
@@ -653,68 +689,10 @@ def Output2Python(OutFileName, codeList , bitmapList) :
 
 
 #bdfファイルに出力する
-def Output2BDF(OutFileName, codeList , bitmapList) :
-    strOutput = ""
-    if isVerbose:
-        print(f"Generating output file: {OutFileName}....")
 
-    with open(OutFileName, "w", encoding="utf-8") as f:
-        strOutput += "STARTFONT\n"
-        strOutput += "COMMENT  This file is auto generated by font.py\n"
-        strOutput += f"FONT {Path(font_path).name} \n"
-        strOutput += f"SIZE {str(font_YSize)} 75 75\n"
-        strOutput += f"FONTBOUNDINGBOX {str(font_XSize)} {str(font_YSize)} 0 0\n"
-        strOutput += f"STARTPROPERTIES 20\n"
-        strOutput += f"FONT_ASCENT 14\n"
-        strOutput += f"FONT_DESCENT 2\n"
-        strOutput += f"DEFAULT_CHAR 8481\n"
-        strOutput += f"COPYRIGHT \"Follow the copyright notice of the original font before conversion.\"\n"
-        strOutput += f"FONTNAME_REGISTRY \"\"\n"
-        strOutput += f"FOUNDRY \"{Path(font_path).name}\"\n"
-        strOutput += f"FAMILY_NAME \"TBD\"\n"
-        strOutput += f"WEIGHT_NAME \"TBD\"\n"
-        strOutput += f"SLANT \"TBD\"\n"
-        strOutput += f"SETWIDTH_NAME \"TBD\"\n"
-        strOutput += f"ADD_STYLE_NAME \"\"\n"
-        strOutput += f"PIXEL_SIZE {str(font_XSize)}\n"
-        strOutput += f"POINT_SIZE 150\n"          
-        strOutput += f"RESOLUTION_X 75\n"
-        strOutput += f"RESOLUTION_Y 75\n"
-        strOutput += f"SPACING \"C\"\n"
-        strOutput += f"AVERAGE_WIDTH {str(font_XSize)}\n"        
-        strOutput += f"CHARSET_REGISTRY \"IJISX0208.1983\"\n"
-        strOutput += f"CHARSET_ENCODING \"0\"\n"
-        strOutput += f"XMBDFED_INFO Converted with font.py\r"
-        strOutput += f"ENDPROPERTIES\n"
-
-        f.write(strOutput)
-        if isVerbose:
-            print(strOutput,end="")
-            print()
-        codeList.sort(key=lambda x: x[2])  # JISコードでソート
-
-        for i, code in enumerate(codeList):
-            strWkLine = ""
-            strWkLine = f"STARTCHAR {code[3]}\n"
-            strWkLine += f"ENCODING {code[2]}\n"
-            strWkLine += f"SWIDTH {font_XSize} 0\n"
-            strWkLine += f"DWIDTH {font_XSize} 0\n"
-            strWkLine += f"BBX {code[4]} {code[5]} 0 0\n"
-            strWkLine += f"BITMAP\n"
-
-            for row in bitmapList[i]:
-                for value in row:
-                    strWkLine += f"{hex(value)[2:].zfill(2)}\n"
-            strWkLine += "ENDCHAR\n"
-            
-            f.write(strWkLine)
-            if isVerbose:
-                print (strWkLine,end="")    
-
-        f.write(strOutput)
  
 
-def Output2FONTX2(OutFileName, codeList, bitmapList):
+def Output2FONTX2(OutFileName, codeList, bitmapList,out_encoding):
     """
     FONTX2形式で全角用・半角用を別々のファイルに出力する（文字コードはShiftJIS、エンディアン逆）
     ヘッダは全角で17バイト（+コードブロック数+テーブル）、半角で16バイト
@@ -725,16 +703,27 @@ def Output2FONTX2(OutFileName, codeList, bitmapList):
     han_file = OutFileName + "_han.fnt"
 
     # コードブロックテーブルを作成（全角用のみ）
-    def make_code_blocks(codeList):
+    def make_code_blocks(codeList,out_encoding):
         blocks = []
         prev = None
         start = None
-        for code in sorted([c[1] for c in codeList if c[1] > 0xFF]):
+        if (out_encoding == "UTF8"):
+            raise SystemExit(GetMessage(isJapanese,"err_cannotuseenc").format(out_encoding,"FONTX2"))
+        elif (out_encoding == "SJIS"):
+            cidx = 1   
+        elif (out_encoding == "JIS"):
+            cidx = 2
+        else:
+            raise SystemExit(GetMessage(isJapanese,"err_notsupportedencoding").format(out_encoding))
+
+        for code in sorted([c[cidx] for c in codeList if c[cidx] > 0xFF]):
             if start is None:
                 start = code
                 prev = code
-            elif code == prev + 1:
+            elif prev != None and code == prev + 1:
                 prev = code
+            elif prev == None :
+                SystemError(GetMessage(isJapanese,"err_logicerror").format(sys._getframe().f_lineno, "make_code_blocks: prev is None but start is not None"))
             else:
                 blocks.append((start, prev))
                 start = code
@@ -789,7 +778,7 @@ def Output2FONTX2(OutFileName, codeList, bitmapList):
         print(GetMessage(isJapanese,"log_done"))
 
     # 全角用ファイル出力（ShiftJISコードを使う、エンディアン逆、ヘッダ18+4*NBバイト）
-    code_blocks = make_code_blocks(sorted_codeList)
+    code_blocks = make_code_blocks(sorted_codeList,out_encoding)
     nb = len(code_blocks)
     if (nb >=256) : 
         raise SystemExit(GetMessage(isJapanese,"err_codeblock").format(nb))
@@ -821,6 +810,88 @@ def Output2FONTX2(OutFileName, codeList, bitmapList):
         print(GetMessage(isJapanese,"log_done"))
 
 
+
+"""
+    BDF形式でビットマップフォントを出力する関数。
+    OutFileName: 出力ファイル名（.bdf推奨）
+    codeList: [[utf8, sjis, jis, char, width, height, offset], ...]
+    bitmapList: 各文字のビットマップデータ
+    font_name: フォント名
+    font_XSize, font_YSize: フォントサイズ
+
+    """
+def Output2BDF(OutFileName, codeList, bitmapList, font_name, font_XSize, font_YSize, bdf_split,out_encoding):
+    import datetime
+    from pathlib import Path
+    def bdf_header(font_name, font_XSize, font_YSize, count):
+        now = datetime.datetime.now()
+        header = f"""STARTFONT 2.1
+FONT {font_name}
+SIZE {font_YSize} 75 75
+FONTBOUNDINGBOX {font_XSize} {font_YSize} 0 0
+STARTPROPERTIES 2
+FONT_ASCENT {font_YSize}
+FONT_DESCENT 0
+ENDPROPERTIES
+CHARS {count}
+"""
+        return header
+    def bdf_char_entry(code, bitmap, font_XSize, font_YSize,out_encoding):
+        width = code[4]
+        height = code[5]
+        bbx = f"BBX {width} {height} 0 0"
+        swidth = f"SWIDTH {int((960 * 16)/width)} 0"
+        dwidth = f"DWIDTH {width} 0"
+
+        if out_encoding == "UTF8":
+            encoding = code[0] 
+            lines = [f"STARTCHAR UTF8:{encoding:04X}", f"ENCODING {encoding}",swidth , dwidth, bbx, f"BITMAP"]
+        elif out_encoding == "SJIS":
+            encoding = code[1] 
+            lines = [f"STARTCHAR SJIS:{encoding:04X}", f"ENCODING {encoding}",swidth , dwidth, bbx, f"BITMAP"]
+        elif out_encoding == "JIS":
+            encoding = code[2] 
+            lines = [f"STARTCHAR JIS:{encoding:04X}", f"ENCODING {encoding}",swidth , dwidth, bbx, f"BITMAP"]
+        else:
+            raise ValueError(GetMessage(isJapanese,"err_notsupportedencoding").format(out_encoding))
+        
+
+        for row in bitmap:
+            hexstr = ''.join(f"{b:02X}" for b in row[:(width+7)//8])
+            lines.append(hexstr)
+        lines.append("ENDCHAR")
+        return '\n'.join(lines)
+    
+
+    if not bdf_split:
+        with open(OutFileName, "w", encoding="utf-8") as f:
+            f.write(bdf_header(font_name, font_XSize, font_YSize, len(codeList)))
+            for code, bitmap in zip(codeList, bitmapList):
+                f.write(bdf_char_entry(code, bitmap, font_XSize, font_YSize,out_encoding))
+                f.write("\n")
+            f.write("ENDFONT\n")
+    else:
+        # 半角
+        han_codes = [(c, b) for c, b in zip(codeList, bitmapList) if c[1] <= 0xFF]
+        zen_codes = [(c, b) for c, b in zip(codeList, bitmapList) if c[1] > 0xFF]
+        han_file = OutFileName.replace('.bdf', '_han.bdf')
+        zen_file = OutFileName.replace('.bdf', '_zen.bdf')
+        # 半角
+        with open(han_file, "w", encoding="utf-8") as f:
+            f.write(bdf_header(font_name+"_HAN", font_XSize//2, font_YSize, len(han_codes)))
+            for code, bitmap in han_codes:
+                f.write(bdf_char_entry(code, bitmap, font_XSize//2, font_YSize,out_encoding))
+                f.write("\n")
+            f.write("ENDFONT\n")
+        # 全角
+        with open(zen_file, "w", encoding="utf-8") as f:
+            f.write(bdf_header(font_name+"_ZEN", font_XSize, font_YSize, len(zen_codes)))
+            for code, bitmap in zen_codes:
+                f.write(bdf_char_entry(code, bitmap, font_XSize, font_YSize,out_encoding))
+                f.write("\n")
+            f.write("ENDFONT\n")
+        if isVerbose:
+            print(GetMessage(isJapanese,"log_done"))
 
 
 if __name__ == "__main__":
@@ -856,24 +927,8 @@ if __name__ == "__main__":
 
 
 
-#    parser = argparse.ArgumentParser(description="""
-#Convert Bitmap data file from TrueType(.TTF) file.
-#
-#This program was originally developed to create font data for displaying Japanese characters on small LCDs commonly used in hobby-electronics projects.
-#As a result, the output file is currently a C++ header file intended for use with a specific program. Direct usage of this header file might be challenging; however, by extracting binary data using an editor or modifying the program, it might be possible to retrieve the data in your desired format.
-#                                     """,
-##                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-#                                        formatter_class=argparse.RawTextHelpFormatter,
-#    epilog='''
-#note:
-#When converting to small-sized images, carefully choose the font file. 
-#Fonts commonly used in GUI-based operating systems (such as MS-Mincho) may not convert well into clean small images.If you need to convert to a small size, it is recommended to use fonts specifically designed for small sizes, such as those with embedded bitmaps, for better results.Specify a source font file with the extension .ttf for conversion.
-#
-#Here is the information about free fonts suitable for small sizes, including those available for commercial use:
-#- Information on Free Fonts: [http://jikasei.me/font/jf-dotfont/]
-#- Direct Download Link: [https://ftp.iij.ad.jp/pub/osdn.jp/users/8/8541/jfdotfont-20150527.7z]
-#    '''
-#    )
+
+
 
     parser = argparse.ArgumentParser(description=GetMessage(isJapanese,"general"),formatter_class=argparse.RawTextHelpFormatter,epilog=GetMessage(isJapanese,"epilog"))
     # コマンドライン引数の解析
@@ -888,7 +943,9 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--mapping", choices=["KANA","NONE"], default="KANA", help=GetMessage(isJapanese,"--mapping"))
     parser.add_argument("-em","--endmark" , choices=["ALLZERO","ALLMAX","NONE"], default="ALLZERO", help=GetMessage(isJapanese,"--endmark"))
 
-    parser.add_argument("-t","--outtype" , choices=["CData","PBinary","Python", "FONTX2"], default="CData", help=GetMessage(isJapanese,"--outtype"))
+    parser.add_argument("-t","--outtype" , choices=["CData","PBinary","Python", "FONTX2","BDF"], default="CData", help=GetMessage(isJapanese,"--outtype"))
+    parser.add_argument("-bs", "--bdf-split", choices=["Default" , "True","False"], default="Default" , help=GetMessage(isJapanese,"--bdf-split"))
+    parser.add_argument("-en" , "--encoding", choices=["DEFAULT" , "UTF8","SJIS","JIS"], default="DEFAULT", help=GetMessage(isJapanese,"--encoding"))
     parser.add_argument("-fr", "--filereplace", action="store_true", help=GetMessage(isJapanese,"--oufilereplacettype"))
     parser.add_argument("-v", "--verbose", action="store_true", help=GetMessage(isJapanese,"--verbose"))
     parser.add_argument("-i", "--image", action="store_true", help=GetMessage(isJapanese,"--image"))
@@ -907,11 +964,27 @@ if __name__ == "__main__":
     outFormat = args.outtype
     isReplace = args.filereplace
     charfile = args.charfile
+    bdf_split = args.bdf_split
+    out_encoding = args.encoding
 
+    #bdf_splitがデフォルトの場合は、BDF形式のときだけTrueにする
+    if (bdf_split.lower() == "default"):
+        if (outFormat == "BDF"):
+            bdf_split = True
+        else:
+            bdf_split = False
+    else:
+        bdf_split = (bdf_split.lower() == "true")
 
-
-
-
+    #エンコーディングのデフォルト値を、出力タイプにより決定する
+    if (out_encoding == "DEFAULT"):
+        if (outFormat == "CData") or (outFormat == "PBinary") or (outFormat == "Python"):
+            out_encoding = "UTF8"
+        elif (outFormat == "FONTX2"):
+            out_encoding = "SJIS"
+        elif (outFormat == "BDF"):
+            out_encoding = "JIS"
+    
 
     #入力ファイルが　”test" なら、テスト用のデータを読み込む
     if (font_path == "test"):
@@ -933,6 +1006,12 @@ if __name__ == "__main__":
             output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".py"
         elif (outFormat == "FONTX2"):
             output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".fnt"
+        elif (outFormat == "BDF"):
+            output_file = Path(font_path).name.split(".")[0] + "_" + str(font_XSize).zfill(2) + "x"+str(font_YSize).zfill(2)  + "_" + code_set +".bdf"
+
+    #全角半角分離(-bsオプション）は、BDF形式のときしか指定できない
+    if (bdf_split and outFormat != "BDF"):
+        raise SystemExit(GetMessage(isJapanese,"err_bdfsplitonlybdf"))
 
     #出力ファイル名に不適切な文字が含まれている場合、アンダースコアに置換する
     if (isReplace):
@@ -976,8 +1055,8 @@ if __name__ == "__main__":
     JISKIGOU = range(0x2121,0x2F7E)
     
     # デバッグ用の特別なフォント範囲
-    test1 = range(0x00A1,0x00A5) 
-    test2 = range(0x443E,0x4440)
+    test1 = range(0x00A1,0xAF) 
+    test2 = range(0x443E,0x4450)
 
     #指定されたフォントセットに基づいて、文字コードを変換してUTF-8/SJIS/JISコードのリスト配列にしておく
     codeList = []                           # コードのリスト。
@@ -988,6 +1067,7 @@ if __name__ == "__main__":
         codeList += getCodeTbl(JISL1)
         codeList += getCodeTbl(JISL2)
         codeList += getCodeTbl(JISKIGOU)   
+   
     elif (code_set == "LEVEL1"):
         if isVerbose :
             print(GetMessage(isJapanese,"log_gencodetbl").format("ASCII/JISL1/JISKIGOU"))
@@ -1061,10 +1141,19 @@ if __name__ == "__main__":
         print(GetMessage(isJapanese,"log_done"))
 
 
-    # コードセットを、最初の要素（UTF-8)でソートする。こうしないと、後から検索するときにバイナリサーチで検索ができないため
+    # コードセットを、指定されたエンコーディングでソートする。こうしないと、後から検索するときにバイナリサーチで検索ができないため
+
     if isVerbose:
-        print(GetMessage(isJapanese,"log_sorting").format("UTF-8"))
-    codeList.sort(key=lambda x: x[0])
+        print(GetMessage(isJapanese,"log_sorting").format(out_encoding))
+    if (out_encoding == "UTF8") :
+        codeList.sort(key=lambda x: x[0])
+    elif (out_encoding == "SJIS") :
+        codeList.sort(key=lambda x: x[1])
+    elif (out_encoding == "JIS") :
+        codeList.sort(key=lambda x: x[2])
+    else:
+        raise SystemExit(GetMessage(isJapanese,"err_notsupportedencoding").format(out_encoding))
+    
     if isVerbose:
         print(GetMessage(isJapanese,"log_done"))
 
@@ -1083,7 +1172,9 @@ if __name__ == "__main__":
     elif outFormat == "Python" :
         Output2Python(output_file,codeList,bmpList)
     elif outFormat == "FONTX2":
-        Output2FONTX2(output_file, codeList, bmpList)
+        Output2FONTX2(output_file, codeList, bmpList,out_encoding)
+    elif outFormat == "BDF":
+        Output2BDF(output_file, codeList, bmpList, Path(font_path).name, font_XSize, font_YSize, bdf_split , out_encoding)
 
     print(GetMessage(isJapanese,"log_success").format(output_file))
 
