@@ -83,11 +83,12 @@
             "console": "integratedTerminal",
             "args":[
                 "-s","14",
-                "-cs","ALL",
+                "-cs","TEST",
 //                "-m" , "NONE",
                 "-v",
                 "-t", "FONTX2",
                 "-fr",
+                "-en", "JIS",
 //                "-i",
 //                "test"
                 "FONTDATA\\JF-Dot-Shinonome14.ttf" 
@@ -111,7 +112,27 @@
                 "FONTDATA\\ipam.ttf" 
             ]
         },        
-
+        {
+            "name": "デバッガー: BDF出力",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args":[
+                "-s","14",
+                "-cs","LEVEL1",
+//                "-m" , "NONE",
+//                 "-v",
+                "-t", "CData",
+                "-bs", "False",
+                "-fr",
+                "-yo","0",
+                "-en" , "SJIS",
+//                "-i",
+//                "test"
+                "FONTDATA\\JF-Dot-Shinonome14.ttf" 
+            ]
+        }, 
     ]
     
 }
