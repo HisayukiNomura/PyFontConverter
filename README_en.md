@@ -75,6 +75,89 @@ This converts FONTDATA/ipam.ttf to 24x24 dots, and outputs IPAMincho_zen.fnt (fu
 - The generated header file can be used as font data for the KNJGfx9341 project.
 
 
+## How to Use the C Header File Format
+
+The C header file output consists of two main parts: a Kanji code table and a bitmap pattern array.
+
+### Kanji Code Table
+
+The Kanji code table is an array of structs, each containing the character code, size, and a pointer (offset) to the bitmap pattern. The array is sorted by the code specified with the -en option (default: UTF-8), so you can use binary search to quickly find the pattern for a given character code.
+
+Example struct:
+
+```c
+struct KanjiData {
+    uint32_t Unicode;
+    uint16_t SJIS;
+    uint16_t JIS;
+    uint8_t width;
+    uint8_t height;
+    uint32_t offsetBMP;
+};
+
+static const KanjiData JFDotShinonome12_12x12_ALL[] = {
+    {0x00000000 , 0x0000 , 0x0000 ,  6 ,12 , 0x00000000}, // "0x00"
+    {0x00000001 , 0x0001 , 0x0001 ,  6 ,12 , 0x0000000c}, // "0x01"
+    {0x00000002 , 0x0002 , 0x0002 ,  6 ,12 , 0x00000018}, // "0x02"
+    ...
+    {0x00e88c85 , 0x8a9d , 0x337d , 12 ,12 , 0x0001d508}, // "茅"
+    ...
+};
+```
+
+### Bitmap Pattern
+
+The bitmap pattern is a large array of bytes, each representing the shape of a character. For example:
+
+```c
+static const uint8_t JFDotShinonome12_12x12_ALL_bitmap[] = {
+// UNICODE:0x00000000 -  Offset:0x00000000   -- CHAR:"0x00" 
+    0x00, 0x00, 0x00, ...
+// UNICODE:0x00e88c85 -  Offset:0x0001d508   -- CHAR:"茅" 
+    0x11, 0x00, 0xff, 0xe0, 0x11, 0x00, 0x7f, 0x80, 0x11, 0x00, 0x0a, 0x00, 0xff, 0xe0, 0x0c, 0x40, 0x14, 0x80, 0x24, 0x00, 0xc4, 0x00, 0x0c, 0x00,
+    ...
+};
+```
+
+### How to Find a Character Pattern
+
+The bitmap pattern array does not contain character code information. To get the pattern for a character, use the offset from the Kanji code table. For example, to display the character "茅" (Unicode 0x00e88c85), search the Kanji code table for this code using binary search. The entry `{0x00e88c85 , 0x8a9d , 0x337d , 12 ,12 , 0x0001d508}` gives the offset `0x0001d508`, so the pattern is at `JFDotShinonome12_12x12_ALL_bitmap[0x0001d508]`.
+
+Even with 6,879 characters, you can find the pattern in at most 13 comparisons using binary search.
+
+#### Example: Binary Search Code
+
+Here is an example (adapted from KanjiHelper.cpp for the KNJGfx9341 project):
+
+```c
+struct KanjiData {
+    uint32_t Unicode;
+    uint16_t SJIS;
+    uint16_t JIS;
+    uint8_t width;
+    uint8_t height;
+    uint32_t offsetBMP;
+};
+
+const KanjiData* FindKanji(uint32_t unicode) {
+    size_t left = 0;
+    size_t right = DataSize - 1;
+    const KanjiData* pKanjiData = JFDotShinonome12_12x12_ALL;
+    while (left <= right) {
+        size_t middle = left + (right - left) / 2;
+        if (pKanjiData[middle].Unicode == unicode) {
+            return &pKanjiData[middle];
+        } else if (pKanjiData[middle].Unicode < unicode) {
+            left = middle + 1;
+        } else {
+            right = middle - 1;
+        }
+    }
+    return NULL;
+}
+```
+
+
 ## License
 
 This project is licensed under the MIT License.
